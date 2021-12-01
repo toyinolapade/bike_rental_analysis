@@ -1,0 +1,154 @@
+---
+title: "Cyclistic"
+author: "Toyin Olapade"
+date: "11/28/2021"
+output: pdf_document
+---
+
+```{r}
+library(tidyverse)
+library(lubridate)
+```
+
+
+```{r}
+dt_202004 <- read.csv("202004-divvy-tripdata.csv")
+dt_202005 <- read.csv("202005-divvy-tripdata.csv")
+dt_202006 <- read.csv("202006-divvy-tripdata.csv")
+dt_202007 <- read.csv("202007-divvy-tripdata.csv")
+dt_202008 <- read.csv("202008-divvy-tripdata.csv")
+dt_202009 <- read.csv("202009-divvy-tripdata.csv")
+dt_202010 <- read.csv("202010-divvy-tripdata.csv")
+dt_202011 <- read.csv("202011-divvy-tripdata.csv")
+dt_202012 <- read.csv("202012-divvy-tripdata.csv")
+dt_202101 <- read.csv("202101-divvy-tripdata.csv")
+dt_202102 <- read.csv("202102-divvy-tripdata.csv")
+dt_202103 <- read.csv("202103-divvy-tripdata.csv")
+dt_202104 <- read.csv("202104-divvy-tripdata.csv")
+dt_202105 <- read.csv("202105-divvy-tripdata.csv")
+dt_202106 <- read.csv("202106-divvy-tripdata.csv")
+dt_202107 <- read.csv("202107-divvy-tripdata.csv")
+dt_202108 <- read.csv("202108-divvy-tripdata.csv")
+dt_202109 <- read.csv("202109-divvy-tripdata.csv")
+dt_202110 <- read.csv("202110-divvy-tripdata.csv")
+
+```
+```{r}
+dt <- rbind(
+  dt_202004,
+  dt_202005,
+  dt_202006,
+  dt_202007,
+  dt_202008,
+  dt_202009,
+  dt_202010,
+  dt_202011,
+  dt_202012,
+  dt_202101,
+  dt_202102,
+  dt_202103,
+  dt_202104,
+  dt_202105,
+  dt_202106,
+  dt_202107,
+  dt_202108,
+  dt_202109,
+  dt_202110
+)
+```
+
+```{r}
+summary(dt)
+head(dt)
+```
+While ha;ndinek
+
+
+
+```{r}
+sum(is.na(dt)) # 199,067
+
+dt %>%
+  filter(start_station_name == "" | end_station_name == "") %>%
+  count() # 982,947
+```
+
+```{r}
+head(dt)
+```
+
+```{r}
+# separate(started_at, into = date("yyyy/mm/dd", "started_time"),sep = ( ) )
+
+dt_202102 %>%
+  date(started_at) %>%
+  head(3)
+
+ymd(date("2020-04-26 17:45:14"))
+```
+
+
+* What are the most frequently used ride type?
+* When do riders ride the most?
+* How does ride duration differ by ride type?
+* Which member type ride with us the most?
+
+
+* What are the most frequently used ride type?
+
+```{r}
+dt %>%  
+  group_by(rideable_type) %>%
+  count()
+
+  
+```
+
+
+* When do riders ride the most?
+* How does ride duration differ by ride type?
+* Which member type ride with us the most?
+
+
+
+Three questions will guide the future marketing program:
+1. How do annual members and casual riders use Cyclistic bikes differently?
+2. Why would casual riders buy Cyclistic annual memberships?
+3. How can Cyclistic use digital media to influence casual riders to become members?
+
+
+1. How do annual members and casual riders use Cyclistic bikes differently?
+
+```{r}
+dt %>%
+  group_by(member_casual) %>% count()
+
+dt %>%
+  group_by(member_casual, rideable_type) %>% 
+  count() 
+
+dt %>%
+  group_by(member_casual, rideable_type) %>% 
+  summarize(
+    n=n()
+  ) %>%
+  mutate(
+    pct_ride <- paste0(round(100 * n/sum(n), 1), "%")
+  ) 
+```
+
+
+2. Why would casual riders buy Cyclistic annual memberships?
+3. How can Cyclistic use digital media to influence casual riders to become members?
+
+
+
+
+
+
+
+
+
+
+
+
