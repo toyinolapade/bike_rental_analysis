@@ -2,16 +2,54 @@
 title: "Cyclistic"
 author: "Toyin Olapade"
 date: "11/28/2021"
-output: pdf_document
+output: 
+  pdf_document: 
+    number_sections: yes
 ---
 
-```{r}
+## Abstract
+
+At Cyclistic, a bike-share company in Chicago, the director of marketing believes the company’s future success depends on maximizing the number of annual memberships. Therefore, the marketing team wants to understand how casual riders and annual members use Cyclistic bikes differently. From these insights, the team will design a new marketing strategy to convert casual riders into annual members. In order to proceed with this goal the executives at Cyclistic require compelling data insights and professional data visualizations, and must approve recommendations resulting from this analysis.
+
+## Introduction
+
+About the company
+In 2016, Cyclistic launched a successful bike-share offering. Since then, the program has grown to a fleet of 5,824 bicycles that are geotracked and locked into a network of 692 stations across Chicago. The bikes can be unlocked from one station and returned to any other station in the system anytime. 
+
+Until now, Cyclistic’s marketing strategy relied on building general awareness and appealing to broad consumer segments. One approach that helped make these things possible was the flexibility of its pricing plans: single-ride passes, full-day passes, and annual memberships. Customers who purchase single-ride or full-day passes are referred to as casual riders. Customers who purchase annual memberships are Cyclistic members.
+
+Cyclistic’s finance analysts have concluded that annual members are much more profitable than casual riders. Although the pricing flexibility helps Cyclistic attract more customers, Lily Moreno, the director of marketing, believes that maximizing the number of annual members will be key to future growth. Rather than creating a marketing campaign that targets all-new customers, Moreno believes there is a very good chance to convert casual riders into members. She notes that casual riders are already aware of the Cyclistic program and have chosen Cyclistic for their mobility needs.
+
+Moreno has set a clear goal: Design marketing strategies aimed at converting casual riders into annual members. In order to do that, however, the marketing analyst team needs to better understand how annual members and casual riders differ, why casual riders would buy a membership, and how digital media could affect their marketing tactics. Moreno and her team are interested in analyzing the Cyclistic historical bike trip data to identify trends.
+
+Three questions will guide the future marketing program: How do annual members and casual riders use Cyclistic bikes differently? Why would casual riders buy Cyclistic annual memberships? How can Cyclistic use digital media to influence casual riders to become members? I have been assigned the first question, and this note reports the following deliverable:
+
+1. A clear statement of the business task
+2. A description of all data sources used
+3. Documentation of any cleaning or manipulation of data
+4. A summary of your analysis
+5. Supporting visualizations and key findings
+6. Your top three recommendations based on your analysis
+
+## Business Task
+
+## Data Sources
+
+## Data Preparation
+
+## Summary of Analysis
+
+## Summary of Key Findings
+
+## Recommendations
+
+```{r chunk-1}
 library(tidyverse)
 library(lubridate)
 ```
 
 
-```{r}
+```{r chunk-2}
 dt_202004 <- read.csv("202004-divvy-tripdata.csv")
 dt_202005 <- read.csv("202005-divvy-tripdata.csv")
 dt_202006 <- read.csv("202006-divvy-tripdata.csv")
@@ -33,7 +71,7 @@ dt_202109 <- read.csv("202109-divvy-tripdata.csv")
 dt_202110 <- read.csv("202110-divvy-tripdata.csv")
 
 ```
-```{r}
+```{r chunk-3}
 dt <- rbind(
   dt_202004,
   dt_202005,
@@ -57,15 +95,15 @@ dt <- rbind(
 )
 ```
 
-```{r}
+```{r chunk-4}
 summary(dt)
 head(dt)
 ```
-While ha;ndinek
+While ha;ndi
 
 
 
-```{r}
+```{r chunk-5}
 sum(is.na(dt)) # 199,067
 
 dt %>%
@@ -73,11 +111,11 @@ dt %>%
   count() # 982,947
 ```
 
-```{r}
+```{r chunk-6}
 head(dt)
 ```
 
-```{r}
+```{r chunk-7, eval=FALSE, include=FALSE}
 # separate(started_at, into = date("yyyy/mm/dd", "started_time"),sep = ( ) )
 
 dt_202102 %>%
@@ -96,7 +134,7 @@ ymd(date("2020-04-26 17:45:14"))
 
 * What are the most frequently used ride type?
 
-```{r}
+```{r chunk-8}
 dt %>%  
   group_by(rideable_type) %>%
   count()
@@ -119,7 +157,7 @@ Three questions will guide the future marketing program:
 
 1. How do annual members and casual riders use Cyclistic bikes differently?
 
-```{r}
+```{r chunk-9}
 dt %>%
   group_by(member_casual) %>% count()
 
@@ -142,10 +180,87 @@ dt %>%
 3. How can Cyclistic use digital media to influence casual riders to become members?
 
 
+We used PostgreSQL pgAdmin 4 as our DBMA.
+
+```
+create table if not exists divvy_tripdata_202004 (
+	ride_id text not null,
+	rideable_type text,
+	started_at timestamp,
+	ended_at timestamp,
+	start_station_name text,
+	start_station_id int,
+	end_station_name text,
+	end_station_id int,
+	start_lat numeric,
+	start_lng numeric,
+	end_lat numeric,
+	end_lng numeric,
+	member_casual text,
+	primary key (ride_id)
+);
+
+copy public.divvy_tripdata_202004
+from 'C:\Toyin_Olapade\Google_case_study\bike_rental_analysis\202004-divvy-tripdata.csv'
+delimiter ',' csv header;
+
+select * from divvy_tripdata_202009
+```
+
+## Connecting to Postgres
+
+The DBI package has the core functionality of connecting R to database servers. There are then packages that implement the core functionality of DBI for each specific implementation of SQL. A package for PostgreSQL is RPostgres.
+
+```{r chunk-10}
+if(!'RPostgres' %in% installed.packages()){
+  install.packages("RPostgres")
+}
+library(RPostgres)
+```
+
+
+We connect with a function call like the following.
+
+Note: this code was generated on my local machine connected to a local copy of the database. Your connection details will be different. Note I also have permissions to modify this database.
+
+```{r chunk-11}
+con = dbConnect(
+  RPostgres::Postgres(), 
+  host="localhost", 
+  port=5432,
+  dbname="google_data_analytics",
+  # user=rstudioapi::askForPassword("Database username"), # postgres
+  # password=rstudioapi::askForPassword("Database password") 
+  user="postgres",
+  password="password" 
+)
+```
 
 
 
+We will need a connection like this for any of the methods of connecting below. You can have multiple connection objects to different databases – just call the variables something different.
 
+Note that the above example doesn’t have a username or password because the database is local and doesn’t require one. If you’re using a remote database, you don’t want to hard core your credentials into your code. There are ways to set environment variables or, for PostgreSQL specifically, use a .pgpass file to store this information. But RStudio also gives you the option to pop up a box to enter the information:
+
+con2 <- dbConnect(RPostgres::Postgres(), 
+                  host="localhost", 
+                  dbname="dvdrental",
+                  user=rstudioapi::askForPassword("Database username"),
+                  password=rstudioapi::askForPassword("Database password"))
+
+
+```{r eval=FALSE, include=FALSE}
+dbListTables(con)
+dbListFields(con, "divvy_tripdata_202004")
+qry = "select * from divvy_tripdata_202004"
+df = dbGetQuery(con, qry)
+head(df)
+```
+```{sql, connection=con, output.var="dt1"}
+select * 
+from divvy_tripdata_202004
+limit 5
+```
 
 
 
