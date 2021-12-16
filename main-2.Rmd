@@ -131,12 +131,15 @@ where date(started_at) >= cast('2020-04-01' as date)
 as_tibble(head(dt_01))
 ```
 
+# Data Analysis
+
 Questions to explore are:
 
 - Which station is patronized the most, and what type of members patronized that station? In other words, does a member type tend to prefer a station over another?
+- Which station has the most rides per day?
 - Do members tend to drop their bike at the same place they picked it from?
  
-Furthermore, one question that is more striking is how many riders patronizes Cyclistics within some period and how is membership type distributed among these riders? However, the data collected by Cyclistic only describe rides and not riders. Each ride has a unique ride id.
+Furthermore, one question that is more striking is how many riders patronizes Cyclistics within some period^[We are assuming that a ride day is identified by the ride's start date-time. The period covers `2020-04-01` to `2021-03-31`.] and how is membership type distributed among these riders? However, the data collected by Cyclistic only describe rides and not riders. Each ride has a unique ride id.
 
 ```{sql, connection=con, output.var="dt_02"}
 select member_typ, count(distinct ride_id) as n_ride
@@ -158,14 +161,7 @@ dt_01 %>%
 as_tibble(head(dt_01))
 ```
 
-
-1226304 casual ride that use classic_bike
-
-How do annual members and casual riders use Cyclistic bikes differently
-
-Assumption: We are assuming that a ride day is identified by the ride start date-time. 
-
-We're trying to compute number of rides per day by ride membership type. We wanted to do that for just one day and we realized that we needed to convert text to date.
+The data suggests that about 40% of the rides are taken by the casual riders. This is surprising though as I would expect casual riders to be more than the annual members. Perhaps there are some benefits that are interesting to the annual members which the casual riders are not utilizing. To look at a similar aspects, we ask if annual members are more motivated than casual riders to ride. We would expect annual members to have more rides per day^[Regardless of seasonality] than the casual riders if this were true.
 
 ```{sql, connection=con, output.var="dt_01"}
 select member_typ, 
@@ -182,10 +178,9 @@ group by member_typ, to_char(date(started_at), 'yy-mm'), date(started_at)
 as_tibble(dt_01)
 ```
 
-We now have ride counts per day but we want to visualize its trend by ride membership type so we can compare paterns between them.
+We now have ride counts per day but we want to visualize its trend by ride membership type so we can compare patterns between them.
 
-
-```{r fig-margin, fig.cap = "MPG vs horsepower, colored by transmission.", fig.fullwidth = TRUE, fig.width=10, fig.height=5, cache=TRUE, message=FALSE}
+```{r fig_001, fig.cap = "MoM Rides by Member Type", fig.fullwidth = TRUE, fig.width=10, fig.height=5, cache=TRUE, message=FALSE}
 dt_01 %>%
   mutate(ride_cnt_=as.numeric(ride_cnt)) %>%
   ggplot(mapping=aes(x=ride_mth, y=ride_cnt_, color=member_typ)) +
@@ -193,6 +188,7 @@ dt_01 %>%
   theme(legend.position = 'bottom')
 ```
 
+From Figure \ref{fig:fig_001} it looks like annual members rides more per day than casual riders. To further explore this we compute and plot the average ride per day for each month in Figure \ref{fig:fig_002}.
 
 ```{sql, connection=con, output.var="dt_02"}
 select member_typ, to_char(ride_dt, 'yy-mm') as ride_mth,
@@ -209,24 +205,43 @@ group by member_typ, to_char(ride_dt, 'yy-mm')
 order by member_typ, ride_mth
 ```
 
-```{r, fig.cap = "MPG vs horsepower, colored by transmission.", fig.fullwidth = FALSE, fig.width=10, fig.height=5, cache=TRUE, message=FALSE}
+```{r fig_002, echo=FALSE, fig.cap="MoM Rides by Member Type", fig.fullwidth=FALSE, fig.height=5, fig.margin=TRUE, fig.width=10, message=FALSE, cache=TRUE}
+dt_02 = dt_02 %>%
+  group_by(member_typ) %>%
+  mutate(mth_id=row_number())
+
+dt_03 = dt_02 %>%
+  group_by(member_typ) %>%
+  mutate(mth_id=row_number()) %>%
+  filter(member_typ %in% ("annual"))
+
+dt_05 = as.data.frame(list(member_typ=rep(c("annual"),36), spline(dt_03$mth_id, dt_03$ride_avg)))
+
+dt_04 = dt_02 %>%
+  group_by(member_typ) %>%
+  mutate(mth_id=row_number()) %>%
+  filter(member_typ %in% ("casual"))
+
+dt_06 = as.data.frame(list(member_typ=rep(c("casual"),36), spline(dt_04$mth_id, dt_04$ride_avg)))
+
+dt_07 = rbind(dt_05, dt_06)
+
 dt_02 %>%
-  ggplot(mapping=aes(x=ride_mth, y=ride_avg, color=member_typ)) +
-  geom_point()
+  ggplot(mapping=aes(x=mth_id, y=ride_avg, color=member_typ)) +
+  geom_point() +
+  geom_line(data=dt_07, aes(x=x, y=y, linetype=member_typ)) +
+  theme(legend.position = 'bottom')
 ```
 
-
-
-```{r, fig.cap = "MPG vs horsepower, colored by transmission.", fig.fullwidth = FALSE, fig.width=10, fig.height=5, cache=TRUE, message=FALSE}
+```{r eval=FALSE, fig.cap="MPG vs horsepower, fig.height=5, fig.width=10, message=FALSE, cache=TRUE, colored by transmission.", fig.fullwidth=FALSE, include=FALSE}
 dt_01 %>%
   mutate(ride_cnt_=as.numeric(ride_cnt)) %>%
   ggplot(mapping=aes(x=ride_mth, y=ride_cnt_, color=member_typ)) +
   geom_boxplot(mapping=aes(color=member_typ)) +
   stat_summary(fun.y=mean, geom="point", shape=1)
-  # geom_point(data=dt_02, mapping=aes(x=ride_mth, y=ride_avg, color=member_typ))
 ```
 
-```{r, fig.cap = "MPG vs horsepower, colored by transmission.", fig.fullwidth = FALSE, fig.width=10, fig.height=5, cache=TRUE, message=FALSE}
+```{r eval=FALSE, fig.cap="MPG vs horsepower, fig.height=5, fig.width=10, message=FALSE, cache=TRUE, colored by transmission.", fig.fullwidth=FALSE, include=FALSE}
 dt_01 %>%
   mutate(ride_cnt_=as.numeric(ride_cnt)) %>%
   ggplot(mapping=aes(x=ride_mth, y=ride_cnt_, fill=member_typ)) +
@@ -238,8 +253,9 @@ dt_01 %>%
   mutate(ride_cnt_=as.numeric(ride_cnt)) %>%
   ggplot(mapping=aes(x=ride_mth, y=ride_cnt_, fill=member_typ)) +
   stat_summary(fun.y=median, geom="point", shape=21, size=4)+
-   labs(title="divvy_cyclist:ride_cnt_ vs.ride_mth", subtitle = "sample of the three rideable_type",
-       caption = "Data collected by divvy cyclyist")+
+   labs(title="divvy_cyclist:ride_cnt_ vs.ride_mth", 
+     subtitle = "sample of the three rideable_type",
+     caption = "Data collected by divvy cyclyist")+
   annotate("text", x=5,y=40,label="The annual member are the highest user")
 
 ```
@@ -252,10 +268,11 @@ select member_typ, rideable_type,
 from divvy_tripdata_
 where date(started_at) >= cast('2020-04-01' as date) 
   and date(started_at) <= cast('2021-03-31' as date)
-group by member_typ, rideable_type, to_char(date(started_at), 'yy-mm'), date(started_at)
+group by member_typ, rideable_type, to_char(date(started_at), 'yy-mm'), 
+  date(started_at)
 ```
 
-```{r, fig.cap = "MPG vs horsepower, colored by transmission.", fig.fullwidth = FALSE, fig.width=10, fig.height=5, cache=TRUE, message=FALSE}
+```{r, fig.cap = "MPG vs horsepower, colored by transmission.", fig.fullwidth = TRUE, fig.width=10, fig.height=5, cache=TRUE, message=FALSE}
 dt_03 %>%
   mutate(ride_cnt_=as.numeric(ride_cnt)) %>%
   ggplot(., mapping=aes(x=ride_mth, y=ride_cnt_, color=member_typ)) +
@@ -263,20 +280,90 @@ dt_03 %>%
   facet_wrap(~rideable_type)
 ```
 
-From the plot, the annual member has the hight ride per day.
+From the plot, the annual member has the high ride per day.
 
 ```{r, fig.cap = "MPG vs horsepower, colored by transmission.", fig.fullwidth = FALSE, fig.width=10, fig.height=5, cache=TRUE, message=FALSE}
 dt_03 %>%
   mutate(ride_cnt_=as.numeric(ride_cnt)) %>%
   ggplot(., mapping=aes(x=ride_mth, y=ride_cnt_, color=member_typ, fill=member_typ)) +
   stat_summary(fun.y=median, geom="point", shape=21, size=4) +
-  facet_wrap(~rideable_type)+
-  labs(title="divvy_cyclist:ride_cnt_ vs.ride_mth", subtitle = "sample of the three rideable_type",
-       caption = "Data collected by divvy cyclyist")+
-  annotate("text", x=5,y=40,label="The annual member are the highest user",angle=15)
+  facet_wrap(~rideable_type)
 ```
 
+# Summary of Key Findings and Recommendations
 
+We report that annual members appear to be more motivated to ride as seen in their higher average rides per day. 
+
+```{r include=FALSE}
+dbDisconnect(con)
+```
+
+# Appendix
+
+## Code to import data to PostgreSQL pgAdmin 14
+
+```
+for ? in {202004, ..., 202110}
+  create table if not exists divvy_tripdata_? (
+  	ride_id text not null,
+  	rideable_type text,
+  	started_at timestamp,
+  	ended_at timestamp,
+  	start_station_name text,
+  	start_station_id text,
+  	end_station_name text,
+  	end_station_id text,
+  	start_lat numeric,
+  	start_lng numeric,
+  	end_lat numeric,
+  	end_lng numeric,
+  	member_casual text,
+  	primary key (ride_id)
+  );
+  
+  copy public.divvy_tripdata_?
+  from 'C:\..\bike_rental_analysis\?-divvy-tripdata.csv'
+  delimiter ',' csv header;
+  
+create table divvy_tripdata as 
+  select * from divvy_tripdata_202004 union all
+  select * from divvy_tripdata_202005 union all
+  select * from divvy_tripdata_202006 union all
+  select * from divvy_tripdata_202007 union all
+  select * from divvy_tripdata_202008 union all
+  select * from divvy_tripdata_202009 union all
+  select * from divvy_tripdata_202010 union all
+  select * from divvy_tripdata_202011 union all
+  select * from divvy_tripdata_202012 union all
+  select * from divvy_tripdata_202101 union all
+  select * from divvy_tripdata_202102 union all
+  select * from divvy_tripdata_202103 union all
+  select * from divvy_tripdata_202104 union all
+  select * from divvy_tripdata_202105 union all
+  select * from divvy_tripdata_202106 union all
+  select * from divvy_tripdata_202107 union all
+  select * from divvy_tripdata_202108 union all
+  select * from divvy_tripdata_202109 union all
+  select * from divvy_tripdata_202110
+;  
+
+create table divvy_tripdata_ as 
+  select ride_id, rideable_type, started_at, ended_at, start_station_name,
+    start_station_id, end_station_name, end_station_id, start_lat, 
+    start_lng, end_lat, end_lng, 
+    case when member_casual='member' then 'annual' else member_casual end as member_typ
+  from divvy_tripdata
+```
+
+```{r eval=FALSE, include=FALSE}
+# useful git command
+git lfs migrate import --include="*.csv"
+git push -u origin master
+```
+
+```{r}
+xfun::session_info(c("rmarkdown", "tidyverse", "tufte", "DBI"))
+```
 
 
 
