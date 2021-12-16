@@ -1,0 +1,45 @@
+
+% \usepackage{filecontents}
+\usepackage[dvipsnames]{xcolor}
+\usepackage{hyperref}
+% \usepackage{cleveref}
+% 
+% \newcommand\myshade{85}
+% \colorlet{mylinkcolor}{violet}
+% \colorlet{mycitecolor}{YellowOrange}
+% \colorlet{myurlcolor}{Aquamarine}
+
+\newcommand\myshade{85}
+\colorlet{mylinkcolor}{RedViolet}
+\colorlet{mycitecolor}{YellowOrange}
+\colorlet{myurlcolor}{BlueGreen}
+
+\hypersetup{
+  linkcolor  = mylinkcolor!\myshade!black,
+  citecolor  = mycitecolor!\myshade!black,
+  urlcolor   = myurlcolor!\myshade!black,
+  colorlinks = true,
+}
+
+\makeatletter
+% Paragraph indentation and separation for normal text
+\renewcommand{\@tufte@reset@par}{%
+  \setlength{\RaggedRightParindent}{1.0pc}%
+  \setlength{\JustifyingParindent}{1.0pc}%
+  \setlength{\parindent}{1pc}%
+  \setlength{\parskip}{0pt}%\baselineskip
+}
+\@tufte@reset@par
+
+% Paragraph indentation and separation for marginal text
+\renewcommand{\@tufte@margin@par}{%
+  \setlength{\RaggedRightParindent}{0.5pc}%
+  \setlength{\JustifyingParindent}{0.5pc}%
+  \setlength{\parindent}{0.0pc}%
+  \setlength{\parskip}{10pt}%
+}
+\makeatother
+
+% you may want to save a copy of \href before redefining it
+% \let\oldhref\href
+% \renewcommand{\href}[2]{#2\footnote{\url{#1}}}

@@ -1,0 +1,488 @@
+---
+title: "Untitled"
+author: "Toyin Olapade"
+date: "12/4/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tufte)
+library(tidyverse)
+library(lubridate)
+if(!'RPostgres' %in% installed.packages()){
+  install.packages("RPostgres")
+}
+library(DBI)
+library(RPostgres)
+# invalidate cache when the tufte version changes
+knitr::opts_chunk$set(cache.extra = packageVersion('tufte'))
+options(htmltools.dir.version = FALSE)
+```
+
+
+```{r chunk-2}
+con = dbConnect(
+  RPostgres::Postgres(), 
+  host="localhost", 
+  port=5432,
+  dbname="google_data_analytics",
+  user="postgres",
+  password="password" 
+)
+```
+
+```{sql, connection=con}
+select *
+from divvy_tripdata
+where date(started_at) >= cast('2020-04-01' as date) 
+  and date(started_at) <= cast('2021-03-31' as date)
+limit 5
+```
+
+```{sql, connection=con}
+select member_casual,
+  count(member_casual) as ab,
+  count(*) as ac,
+  count(ride_id) as ad,
+  count(distinct ride_id) as ae
+from divvy_tripdata
+where date(started_at) >= cast('2020-04-01' as date) 
+  and date(started_at) <= cast('2021-03-31' as date)
+group by member_casual
+```
+
+```{sql, connection=con}
+select member_casual, rideable_type,
+  count(distinct ride_id) as ae
+from divvy_tripdata
+where date(started_at) >= cast('2020-04-01' as date) 
+  and date(started_at) <= cast('2021-03-31' as date)
+group by member_casual, rideable_type
+```
+
+1226304 casual ride that use classic_bike
+
+How do annual members and casual riders use Cyclistic bikes differently
+
+```{sql, connection=con}
+select *, date(started_at) as ride_dt, 
+  extract(year from started_at) as ride_yr, 
+  extract(month from started_at) as ride_mth
+from divvy_tripdata
+
+limit 5
+```
+
+Assumption: We are assuming that a ride day is identified by the ride start date-time. 
+
+We're trying to compute number of rides per day by ride membership type. We wanted to do that for just one day and we realized that we needed to convert text to date.
+
+```{sql, connection=con}
+select *
+from divvy_tripdata
+where date(started_at) = CAST('2020-04-12' AS DATE)
+limit 5
+```
+
+```{sql, connection=con}
+select  member_casual,
+  count(distinct ride_id) as pd
+from divvy_tripdata
+where date(started_at) >= cast('2020-04-01' as date) 
+  and date(started_at) <= cast('2021-03-31' as date)
+group by member_casual
+```
+
+```{sql, connection=con, output.var="dt_01"}
+select member_casual, 
+  to_char(date(started_at), 'yy-mm') as ride_mth, 
+  date(started_at) as ride_dt,
+  count(distinct ride_id) as ride_cnt
+from divvy_tripdata
+where date(started_at) >= cast('2020-04-01' as date) 
+  and date(started_at) <= cast('2021-03-31' as date)
+group by member_casual, to_char(date(started_at), 'yy-mm'), date(started_at)
+```
+
+
+We now have ride counts per day but we want to visualize its trend by ride membership type so we can compare paterns between them.
+
+```{r}
+# dt_01 %>%
+#   ggplot() +
+
+dt_01 %>%
+  mutate(ride_cnt_=as.numeric(ride_cnt)) %>%
+  ggplot(., mapping=aes(x=ride_mth, y=ride_cnt_, color=member_casual)) +
+  geom_boxplot()
+```
+
+```{sql, connection=con, output.var="dt_02"}
+select member_casual, to_char(ride_dt, 'yy-mm') as ride_mth,
+  avg(ride_cnt) as ride_avg
+from (
+  select member_casual, date(started_at) as ride_dt,
+    count(distinct ride_id) as ride_cnt
+  from divvy_tripdata
+  where date(started_at) >= cast('2020-04-01' as date) 
+    and date(started_at) <= cast('2021-03-31' as date)
+  group by member_casual, date(started_at)
+) as a
+group by member_casual, to_char(ride_dt, 'yy-mm')
+order by member_casual, ride_mth
+```
+
+
+
+```{r}
+dt_02 %>%
+  ggplot(mapping=aes(x=ride_mth, y=ride_avg, color=member_casual)) +
+  geom_point()
+```
+
+
+```{r}
+dt_01 %>%
+  mutate(ride_cnt_=as.numeric(ride_cnt)) %>%
+  ggplot(mapping=aes(x=ride_mth, y=ride_cnt_, color=member_casual)) +
+  geom_boxplot(mapping=aes(color=member_casual)) +
+  stat_summary(fun.y=mean, geom="point", shape=1)
+  # geom_point(data=dt_02, mapping=aes(x=ride_mth, y=ride_avg, color=member_casual))
+```
+
+```{r}
+dt_01 %>%
+  mutate(ride_cnt_=as.numeric(ride_cnt)) %>%
+  ggplot(mapping=aes(x=ride_mth, y=ride_cnt_, fill=member_casual)) +
+  stat_summary(fun.y=median, geom="point", shape=21, size=4)
+```
+
+```{r}
+dt_01 %>%
+  mutate(ride_cnt_=as.numeric(ride_cnt)) %>%
+  ggplot(mapping=aes(x=ride_mth, y=ride_cnt_, fill=member_casual)) +
+  stat_summary(fun.y=median, geom="point", shape=21, size=4)+
+   labs(title="divvy_cyclist:ride_cnt_ vs.ride_mth", subtitle = "sample of the three rideable_type",
+       caption = "Data collected by divvy cyclyist")+
+  annotate("text", x=5,y=40,label="The annual member are the highest user")
+
+```
+
+
+```{sql, connection=con, output.var="dt_03"}
+select member_casual, rideable_type,
+  to_char(date(started_at), 'yy-mm') as ride_mth, 
+  date(started_at) as ride_dt,
+  count(distinct ride_id) as ride_cnt
+from divvy_tripdata
+where date(started_at) >= cast('2020-04-01' as date) 
+  and date(started_at) <= cast('2021-03-31' as date)
+group by member_casual, rideable_type, to_char(date(started_at), 'yy-mm'), date(started_at)
+```
+
+
+```{r}
+dt_03 %>%
+  mutate(ride_cnt_=as.numeric(ride_cnt)) %>%
+  ggplot(., mapping=aes(x=ride_mth, y=ride_cnt_, color=member_casual)) +
+  geom_boxplot() + 
+  facet_wrap(~rideable_type)
+```
+From the plot, the annual member has the hight ride per day.
+
+
+
+```{r}
+dt_03 %>%
+  mutate(ride_cnt_=as.numeric(ride_cnt)) %>%
+  ggplot(., mapping=aes(x=ride_mth, y=ride_cnt_, color=member_casual, fill=member_casual)) +
+  stat_summary(fun.y=median, geom="point", shape=21, size=4) +
+  facet_wrap(~rideable_type)+
+  labs(title="divvy_cyclist:ride_cnt_ vs.ride_mth", subtitle = "sample of the three rideable_type",
+       caption = "Data collected by divvy cyclyist")+
+  annotate("text", x=5,y=40,label="The annual member are the highest user",angle=15)
+```
+
+
+
+```{sql, connection=con, output.var="dt_03"}
+select member_typ, rideable_type, started_at, ended_at, 
+ended_at - started_at as ride_dur_, 
+  date_part('day', ended_at-started_at)*24 as d, date_part('hour', ended_at-started_at)*60 as h,
+  date_part('minute', ended_at-started_at) as m,
+  date_part('day', ended_at-started_at)*24*60 + date_part('hour', ended_at-started_at)*60 + date_part('minute', ended_at-started_at) as ride_dur,
+  extract(dow from started_at) as bdow_nbr, to_char(started_at, 'day') as bdow_name
+from divvy_tripdata_
+where date(started_at) >= cast('2020-04-01' as date) 
+  and date(started_at) <= cast('2021-03-31' as date)
+```
+
+```{r}
+dt_03 %>% 
+  summary()
+  group_by(member_typ) %>%
+  summarise (avg=mean(ride_dur), max=max(ride_dur), min=min(ride_dur), n=n()) %>%
+  mutate(pct=paste0(round(100 * n/sum(n), 0), "%"))
+```
+
+```{r}
+dt_03 %>%
+  arrange(d)
+  # arrange(desc(d))
+```
+noticed negative ride duration
+how many rides does this affect?
+
+```{r}
+dt_03 %>%
+  filter(d<0) %>%
+  group_by(member_typ) %>%
+  summarise(n=n())
+  # arrange(desc(d))
+```
+
+we will assume for these cases that the start and end datetime are switched incorrectly.
+
+```{sql, connection=con, output.var="dt_03"}
+select member_typ, rideable_type, started_at, ended_at, 
+ended_at - started_at as ride_dur_, 
+  date_part('day', ended_at-started_at)*24 as d, date_part('hour', ended_at-started_at)*60 as h,
+  date_part('minute', ended_at-started_at) as m,
+  abs(date_part('day', ended_at-started_at)*24*60 + date_part('hour', ended_at-started_at)*60 + date_part('minute', ended_at-started_at)) as ride_dur,
+  extract(dow from started_at) as bdow_nbr, to_char(started_at, 'day') as bdow_name
+from divvy_tripdata_
+where date(started_at) >= cast('2020-04-01' as date) 
+  and date(started_at) <= cast('2021-03-31' as date)
+```
+
+```{r}
+dt_03 %>%
+  arrange(d)
+  # arrange(desc(d))
+```
+
+```{r}
+dt_03 %>%
+  ggplot(mapping=aes(x=member_typ, y=ride_dur, color=member_typ)) +
+  geom_boxplot(mapping=aes(color=member_typ)) +
+  stat_summary(fun.y=mean, geom="point", shape=1)
+```
+```{r}
+dt_03 %>%
+  ggplot(mapping=aes(x=ride_dur, fill=member_typ)) +
+  geom_histogram() +
+  facet_wrap(~member_typ)
+```
+
+ggplot(df, aes(x=weight)) + 
+ geom_histogram(aes(y=..density..), colour="black", fill="white")+
+ geom_density(alpha=.2, fill="#FF6666")
+ 
+ mu <- ddply(df, "sex", summarise, grp.mean=mean(weight))
+
+```{r}
+
+mu = dt_03 %>% 
+  group_by(member_typ) %>%
+  summarise (avg=mean(ride_dur), med=median(ride_dur)) 
+
+dt_03 %>%
+  ggplot(mapping=aes(x=log(ride_dur), fill=member_typ)) +
+  geom_histogram(aes(y=..density..)) +
+  geom_density(kernel = "gaussian") +
+  geom_vline(data=mu, aes(xintercept=avg, color=member_typ), linetype="dashed") +
+  geom_vline(data=mu, aes(xintercept=med, color=member_typ), linetype="dashed") +
+  facet_wrap(~member_typ)
+
+dt_03 %>%
+  ggplot(mapping=aes(x=log(ride_dur), fill=member_typ)) +
+  geom_qq(aes(sample=ride_dur)) +
+  facet_wrap(~member_typ)
+```
+
+```{r}
+dt_03 %>%
+  group_by(member_typ, rideable_type) %>%
+  summarise (avg=mean(ride_dur), n=n()) %>%
+  mutate(pct=paste0(round(100 * n/sum(n), 0), "%"))
+```
+
+2. A description of all data sources used
+
+3. Documentation of any cleaning or manipulation of data
+4. A summary of your analysis
+5. Supporting visualizations and key findings
+6. Your top three recommendations based on your analysis
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r chunk-4}
+summary(dt)
+head(dt)
+```
+While ha;ndi
+
+
+
+```{r chunk-5}
+sum(is.na(dt)) # 199,067
+
+dt %>%
+  filter(start_station_name == "" | end_station_name == "") %>%
+  count() # 982,947
+```
+
+```{r chunk-6}
+head(dt)
+```
+
+```{r chunk-7, eval=FALSE, include=FALSE}
+# separate(started_at, into = date("yyyy/mm/dd", "started_time"),sep = ( ) )
+
+dt_202102 %>%
+  date(started_at) %>%
+  head(3)
+
+ymd(date("2020-04-26 17:45:14"))
+```
+
+
+* What are the most frequently used ride type?
+* When do riders ride the most?
+* How does ride duration differ by ride type?
+* Which member type ride with us the most?
+
+
+* What are the most frequently used ride type?
+
+```{r chunk-8}
+dt %>%  
+  group_by(rideable_type) %>%
+  count()
+
+  
+```
+
+
+* When do riders ride the most?
+* How does ride duration differ by ride type?
+* Which member type ride with us the most?
+
+
+
+Three questions will guide the future marketing program:
+1. How do annual members and casual riders use Cyclistic bikes differently?
+2. Why would casual riders buy Cyclistic annual memberships?
+3. How can Cyclistic use digital media to influence casual riders to become members?
+
+
+1. How do annual members and casual riders use Cyclistic bikes differently?
+
+```{r chunk-9}
+dt %>%
+  group_by(member_casual) %>% count()
+
+dt %>%
+  group_by(member_casual, rideable_type) %>% 
+  count() 
+
+dt %>%
+  group_by(member_casual, rideable_type) %>% 
+  summarize(
+    n=n()
+  ) %>%
+  mutate(
+    pct_ride <- paste0(round(100 * n/sum(n), 1), "%")
+  ) 
+```
+
+
+2. Why would casual riders buy Cyclistic annual memberships?
+3. How can Cyclistic use digital media to influence casual riders to become members?
+
+
+We used PostgreSQL pgAdmin 4 as our DBMA.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
